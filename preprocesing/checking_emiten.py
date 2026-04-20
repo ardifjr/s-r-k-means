@@ -4,9 +4,9 @@ import os
 import glob
 
 # 1. Konfigurasi
-path_training = r'E:\Semester 7\TA\code\testing'
-start_date = "2023-12-26"
-end_date = "2025-12-26"
+path_training = r'E:\Semester 7\TA\code\training'
+start_date = "2019-12-26"
+end_date = "2023-12-26"
 
 # Daftar lengkap 41 emiten (Pastikan kode sesuai dengan nama file CSV kamu)
 emiten_dict = {

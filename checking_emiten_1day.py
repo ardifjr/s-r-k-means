@@ -1,53 +1,83 @@
 import yfinance as yf
 import pandas as pd
 
-# ================= CONFIGURATION =================
-EMITEN_JK = "MEDC.JK"        # Pastikan pakai .JK untuk Bursa Efek Indonesia
-TANGGAL_CEK = "2026-04-17"   # Tanggal yang ingin kamu kroscek (YYYY-MM-DD)
-# =================================================
+def get_idx_fraksi(price):
+    """
+    Fungsi untuk membulatkan harga sesuai aturan Fraksi Harga IDX terbaru.
+    """
+    if price < 200:
+        # Fraksi 1, Kelipatan 1
+        return round(price)
+    elif 200 <= price < 500:
+        # Fraksi 2, Kelipatan 2
+        return round(price / 2) * 2
+    elif 500 <= price < 2000:
+        # Fraksi 5, Kelipatan 5
+        return round(price / 5) * 5
+    elif 2000 <= price < 5000:
+        # Fraksi 10, Kelipatan 10
+        return round(price / 10) * 10
+    elif price >= 5000:
+        # Fraksi 25, Kelipatan 25
+        return round(price / 25) * 25
+    else:
+        return price
 
-def check_yfinance_live(ticker, tanggal):
-    print(f"--- Fetching Data Live for {ticker} pada {tanggal} ---")
+def check_stock_data(ticker, tanggal):
+    """
+    Mengambil data OHLCV dan melakukan normalisasi fraksi harga.
+    """
+    # Menambahkan .JK jika belum ada
+    if not ticker.endswith(".JK"):
+        ticker = f"{ticker}.JK"
     
-    # Kita ambil range 3 hari di sekitar tanggal tersebut supaya 
-    # bisa lihat konteks data sebelum/sesudahnya
-    start = pd.to_datetime(tanggal) - pd.Timedelta(days=2)
-    end = pd.to_datetime(tanggal) + pd.Timedelta(days=2)
+    print(f"--- Memeriksa Data: {ticker} | Tanggal: {tanggal} ---")
+    
+    # Ambil data sedikit lebih lebar agar pasti kena tanggalnya
+    start_dt = pd.to_datetime(tanggal)
+    end_dt = start_dt + pd.Timedelta(days=1)
     
     try:
-        # auto_adjust=False agar dapat harga murni seperti di Stockbit
-        data = yf.download(ticker, start=start, end=end, progress=False, auto_adjust=False)
+        # auto_adjust=False untuk mematikan penyesuaian otomatis awal
+        data = yf.download(ticker, start=start_dt, end=end_dt, progress=False, auto_adjust=False)
         
         if data.empty:
-            print(f"❌ Tidak ada data ditemukan untuk {ticker} di rentang tersebut.")
+            print(f"❌ Data tidak ditemukan untuk {ticker} pada {tanggal}.")
             return
 
-        # Flatten columns jika MultiIndex
+        # Meratakan kolom jika MultiIndex
         if isinstance(data.columns, pd.MultiIndex):
             data.columns = data.columns.get_level_values(0)
-        
+
         data.reset_index(inplace=True)
-        data['Date'] = data['Date'].dt.strftime('%Y-%m-%d')
         
-        # Cari baris spesifik
-        hasil_spesifik = data[data['Date'] == tanggal]
+        # Ambil baris pertama
+        row = data.iloc[0]
         
-        if not hasil_spesifik.empty:
-            print("\n✅ DATA DITEMUKAN:")
-            print(hasil_spesifik.to_string(index=False))
-            
-            # Cek apakah ini data desimal aneh (ciri-ciri adjusted rusak)
-            close_val = hasil_spesifik['Close'].values[0]
-            if len(str(close_val).split('.')[-1]) > 2:
-                print("\n⚠️ ALERT: Data ini mengandung desimal panjang. "
-                      "Artinya Yahoo Finance sudah melakukan adjustment internal.")
-        else:
-            print(f"\n⚠️ Tanggal {tanggal} tidak ditemukan (mungkin hari libur bursa).")
-            print("Data terdekat yang tersedia:")
-            print(data.to_string(index=False))
+        # Tampilkan Data Mentah (Original Yahoo)
+        print("\n[DATA ORIGINAL YAHOO]")
+        print(f"Open   : {row['Open']}")
+        print(f"High   : {row['High']}")
+        print(f"Low    : {row['Low']}")
+        print(f"Close  : {row['Close']}")
+        print(f"Volume : {int(row['Volume'])}")
+
+        # Tampilkan Data Normalisasi (Fraksi IDX)
+        print("\n[DATA NORMALISASI (FRAKSI IDX)]")
+        print(f"Open   : {get_idx_fraksi(row['Open'])}")
+        print(f"High   : {get_idx_fraksi(row['High'])}")
+        print(f"Low    : {get_idx_fraksi(row['Low'])}")
+        print(f"Close  : {get_idx_fraksi(row['Close'])}")
+        print(f"Volume : {int(row['Volume'])}")
+        
+        print("-" * 50)
 
     except Exception as e:
         print(f"❌ Error: {e}")
 
-# Eksekusi
-check_yfinance_live(EMITEN_JK, TANGGAL_CEK)
+# ================= INPUT VARIABLE =================
+TICKER = "bbrm"       # Masukkan Kode Saham
+TANGGAL = "2021-12-17" # Masukkan Tanggal (YYYY-MM-DD)
+# ==================================================
+
+check_stock_data(TICKER, TANGGAL)
