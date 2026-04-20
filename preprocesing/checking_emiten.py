@@ -3,12 +3,10 @@ import yfinance as yf
 import os
 import glob
 
-# 1. Konfigurasi
 path_training = r'E:\Semester 7\TA\code\training'
 start_date = "2019-12-26"
 end_date = "2023-12-26"
 
-# Daftar lengkap 41 emiten (Pastikan kode sesuai dengan nama file CSV kamu)
 emiten_dict = {
     "DSSA": "DSSA.JK", "BUMI": "BUMI.JK", "PTRO": "PTRO.JK", "ADRO": "ADRO.JK",
     "TCPI": "TCPI.JK", "PGAS": "PGAS.JK", "ENRG": "ENRG.JK", "MEDC": "MEDC.JK",
@@ -36,11 +34,9 @@ for kode, ticker in emiten_dict.items():
         continue
     
     try:
-        # Load Data Lokal
         df_local = pd.read_csv(local_files[0], skiprows=[1])
         df_local['Tanggal'] = pd.to_datetime(df_local['Tanggal']).dt.date
         
-        # Download Data Pembanding (Auto Adjust False untuk harga murni)
         data_online = yf.download(ticker, start=start_date, end=end_date, progress=False, auto_adjust=False)
         
         if isinstance(data_online.columns, pd.MultiIndex):
@@ -48,7 +44,6 @@ for kode, ticker in emiten_dict.items():
         data_online.reset_index(inplace=True)
         data_online['Date'] = data_online['Date'].dt.date
 
-        # Merge untuk validasi
         merged = pd.merge(df_local, data_online, left_on='Tanggal', right_on='Date', suffixes=('_Lokal', '_Online'))
         
         error_in_emiten = 0
@@ -57,7 +52,6 @@ for kode, ticker in emiten_dict.items():
             v_online = float(row['Close_Online'])
             vol_lokal = float(row['Volume_Lokal'])
             
-            # Logika deteksi: Selisih > 2% ATAU Desimal terlalu panjang (ciri adjusted rusak) ATAU Vol 0
             diff_pct = abs(v_lokal - v_online) / v_online if v_online != 0 else 0
             is_bad_decimal = len(str(v_lokal).split('.')[-1]) > 4 if '.' in str(v_lokal) else False
             
@@ -80,7 +74,6 @@ for kode, ticker in emiten_dict.items():
     except Exception as e:
         print(f"[ERROR] {kode} gagal diproses: {e}")
 
-# === PRINT INSIGHT AKHIR ===
 print("\n" + "="*50)
 print("📊 INSIGHT KUALITAS DATA (DATA INTEGRITY REPORT)")
 print("="*50)
@@ -94,7 +87,6 @@ else:
     print(f"{'Emiten':<10} | {'Total Data':<12} | {'Jml Error':<10} | {'Error Rate':<10}")
     print("-" * 50)
     
-    # Sortir berdasarkan error rate tertinggi
     sorted_dirty = sorted(dirty_emiten.items(), key=lambda x: x[1]['error_rate'], reverse=True)
     
     for kode, stat in sorted_dirty:
@@ -107,6 +99,5 @@ else:
     print("- Data relatif bersih, cukup perbaiki/hapus baris yang bermasalah di emiten tersebut.")
 print("="*50)
 
-# Simpan detail ke CSV
 if discrepancy_report:
     pd.DataFrame(discrepancy_report).to_csv("detail_error_emiten.csv", index=False)
