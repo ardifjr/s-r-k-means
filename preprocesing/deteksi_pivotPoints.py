@@ -8,47 +8,47 @@ path_output = r'E:\Semester 7\TA\code\preprocesing\pivot_point'
 if not os.path.exists(path_output):
     os.makedirs(path_output)
 
-all_files = [f for f in glob.glob(os.path.join(path_training, "*.csv")) if "_with_pivot" not in f]
+all_files = glob.glob(os.path.join(path_training, "*.csv"))
 
-def detect_pivot_points(df):
+def detect_fractal_pivots(df, order=1):
     """
-    Menghitung Pivot Point Standard (PP), Resistance (R1-R3), 
-    dan Support (S1-S3) berdasarkan data H, L, C HARI SEBELUMNYA.
+    Logika sesuai contoh manual:
+    - Pivot High: High hari ini > High 1 hari sebelum DAN 1 hari sesudah.
+    - Pivot Low: Low hari ini < Low 1 hari sebelum DAN 1 hari sesudah.
     """
-    df['Prev_High'] = df['High'].shift(1)
-    df['Prev_Low'] = df['Low'].shift(1)
-    df['Prev_Close'] = df['Close'].shift(1)
-
-    df['PP'] = (df['Prev_High'] + df['Prev_Low'] + df['Prev_Close']) / 3
+    df['Pivot_High'] = None
+    df['Pivot_Low'] = None
     
-    df['R1'] = (2 * df['PP']) - df['Prev_Low']
-    df['R2'] = df['PP'] + (df['Prev_High'] - df['Prev_Low'])
-    df['R3'] = df['Prev_High'] + 2 * (df['PP'] - df['Prev_Low'])
-    
-    df['S1'] = (2 * df['PP']) - df['Prev_High']
-    df['S2'] = df['PP'] - (df['Prev_High'] - df['Prev_Low'])
-    df['S3'] = df['Prev_Low'] - 2 * (df['Prev_High'] - df['PP'])
-    
-    df.drop(['Prev_High', 'Prev_Low', 'Prev_Close'], axis=1, inplace=True)
+    for i in range(order, len(df) - order):
+        current_high = df.loc[i, 'High']
+        current_low = df.loc[i, 'Low']
+        
+        if all(current_high > df.loc[i-j, 'High'] for j in range(1, order + 1)) and \
+           all(current_high > df.loc[i+j, 'High'] for j in range(1, order + 1)):
+            df.at[i, 'Pivot_High'] = current_high
+            
+        if all(current_low < df.loc[i-j, 'Low'] for j in range(1, order + 1)) and \
+           all(current_low < df.loc[i+j, 'Low'] for j in range(1, order + 1)):
+            df.at[i, 'Pivot_Low'] = current_low
+            
     return df
 
-print(f"Memulai deteksi Pivot Points untuk {len(all_files)} file...")
+print(f"Memulai deteksi Fractal Pivot Points (Order=1)...")
 
 for file in all_files:
     file_name = os.path.basename(file)
-    
-    df = pd.read_csv(file) 
+    df = pd.read_csv(file)
     
     df['Tanggal'] = pd.to_datetime(df['Tanggal'])
-    df.sort_values('Tanggal', inplace=True)
+    df = df.sort_values('Tanggal').reset_index(drop=True)
     
-    df_with_pivot = detect_pivot_points(df)
-    
-    df_with_pivot.dropna(inplace=True)
+    df_result = detect_fractal_pivots(df, order=1)
     
     output_path = os.path.join(path_output, file_name)
+    df_result.to_csv(output_path, index=False)
     
-    df_with_pivot.to_csv(output_path, index=False)
-    print(f"✅ Selesai: {file_name} -> Saved to pivot_point folder")
+    total_high = df_result['Pivot_High'].notna().sum()
+    total_low = df_result['Pivot_Low'].notna().sum()
+    print(f"{file_name}: Pivot High={total_high}, Pivot Low={total_low}")
 
-print(f"\nProses Selesai! Total {len(all_files)} emiten telah diproses.")
+print(f"\nProses Selesai! Data tersimpan di: {path_output}")
