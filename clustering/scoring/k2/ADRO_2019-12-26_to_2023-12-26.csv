@@ -1,5 +1,0 @@
-Type,Min,Max,Centroid_Price,Strength,Zone_Boundary,Norm_Distance,Current_Price,Score,Ranking
-Resistance,2620.0,3470.0,3035.09,53,2620.0,0.0116,2590.0,2455.64,1
-Resistance,3640.0,4250.0,3936.82,22,3640.0,0.4054,2590.0,52.96,2
-Support,1720.0,2570.0,2205.94,32,2570.0,0.0077,2590.0,1805.66,1
-Support,610.0,1660.0,1202.45,92,1660.0,0.3591,2590.0,249.27,2

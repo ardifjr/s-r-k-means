@@ -1,0 +1,17 @@
+Type,Min,Max,Centroid_Price,Std_Internal,Strength
+Resistance,388,388,388,0.0,1
+Resistance,405,417,411,5.76,5
+Resistance,432,434,433,1.15,3
+Resistance,480,506,493,12.53,3
+Resistance,533,554,544,10.31,4
+Resistance,561,576,568,7.64,3
+Resistance,590,596,593,2.89,3
+Resistance,617,673,645,28.28,2
+Support,80,97,89,8.56,55
+Support,107,119,113,6.1,18
+Support,125,140,133,7.09,9
+Support,154,168,161,6.69,24
+Support,178,197,187,9.6,20
+Support,247,273,260,13.07,18
+Support,290,318,304,13.65,21
+Support,344,376,360,15.8,6

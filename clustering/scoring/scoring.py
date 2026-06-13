@@ -7,7 +7,7 @@ path_training = r'E:\Semester 7\TA\code\training'
 base_path_clustering = r'E:\Semester 7\TA\code\clustering'
 base_path_scoring = r'E:\Semester 7\TA\code\clustering\scoring'
 
-k_variants = [2, 3, 4]
+k_variants = [2, 3, 4, 5, 6, 7, 8, 9, 10]
 
 def calculate_scoring(df_zona, current_price):
     """
