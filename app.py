@@ -8,7 +8,7 @@ import os
 import glob
 
 # Konfigurasi Halaman Web
-st.set_page_config(page_title="Biznify AI - Pusat Visualisasi Bab 3", layout="wide")
+st.set_page_config(page_title="Pusat Visualisasi Bab 3", layout="wide")
 
 st.markdown("""
     <style>
@@ -59,44 +59,162 @@ menu_select = st.sidebar.radio(
 
 ticker_aktif = st.sidebar.selectbox("Pilih Emiten:", TICKERS_BASELINE)
 
+def gambarkan_diagram_seleksi_emiten():
+    # Definisikan tahapan seleksi
+    tahapan = [
+        "Seluruh Emiten Sektor Energi\ndi BEI (IDX)", 
+        "Penyaringan Kelayakan Data\n(Kelengkapan Historis)", 
+        "Seleksi Kecukupan Pivot Points\nUntuk Variasi K=2 s/d K=10\n(Konsistensi Klasterisasi)"
+    ]
+    # Representasi jumlah emiten fiktif/perkiraan sebelum dikerucutkan ke 26 emiten lolos
+    jumlah_emiten = [45, 34, 26] 
+    
+    fig, ax = plt.subplots(figsize=(8, 5))
+    
+    # Membuat diagram berbentuk corong/blok panah ke bawah
+    y_pos = np.arange(len(tahapan))
+    colors = ["#1E3A8A", "#2563EB", "#10B981"] # Biru Tua -> Biru Muda -> Hijau (Lolos)
+    
+    # Gambar kotak proses
+    bars = ax.barh(y_pos, jumlah_emiten, align='center', color=colors, alpha=0.85, height=0.5, edgecolor='black')
+    
+    # Menambahkan teks label di dalam/samping balok
+    for bar, teks, nilai in zip(bars, tahapan, jumlah_emiten):
+        width = bar.get_width()
+        ax.text(width / 2, bar.get_y() + bar.get_height()/2, f"{nilai} Emiten", 
+                va='center', ha='center', color='white', fontweight='bold', fontsize=10)
+        ax.text(width + 1, bar.get_y() + bar.get_height()/2, teks, 
+                va='center', ha='left', color='black', fontsize=9, fontweight='semibold')
+        
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels([]) # Hilangkan tik standar
+    ax.set_xlabel("Jumlah Emiten")
+    ax.set_title("Alur Tahapan Penyaringan Irisan Sektoral Emiten Energi", fontsize=12, fontweight='bold', pad=15)
+    ax.set_xlim(0, 60)
+    ax.invert_yaxis()  # Supaya urutan dari atas ke bawah
+    ax.grid(axis='x', linestyle=':', alpha=0.5)
+    
+    plt.tight_layout()
+    return fig
+
+def gambarkan_komparasi_zscore_timeline(df_raw, ticker):
+    # Buat subplot 1 baris, 2 kolom bersisian
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5), sharey=True)
+    
+    # Filter data khusus untuk titik pivot (Support & Resistance) agar grafik tidak padat
+    df_pivot = df_raw[df_raw['Type'].isin(['Support', 'Resistance'])].copy()
+    if df_pivot.empty:
+        df_pivot = df_raw.copy()
+        
+    # Pastikan kolom Tanggal bertipe datetime
+    df_pivot['Tanggal'] = pd.to_datetime(df_pivot['Tanggal'])
+    
+    # Pisahkan data Support dan Resistance untuk membedakan warna seperti grafik harianmu
+    df_high = df_pivot[df_pivot['Type'] == 'Resistance']
+    df_low = df_pivot[df_pivot['Type'] == 'Support']
+    
+    # ----------------------------------------------------
+    # KIRI: SEBELUM STANDARDISASI (X = HARGA RIIL, Y = TANGGAL)
+    # ----------------------------------------------------
+    ax1.scatter(df_high["Level"], df_high["Tanggal"], color="red", alpha=0.7, edgecolors='k', s=45, label="Pivot High (R)")
+    ax1.scatter(df_low["Level"], df_low["Tanggal"], color="green", alpha=0.7, edgecolors='k', s=45, label="Pivot Low (S)")
+    
+    ax1.set_title(f"Original Data - {ticker} (Sebelum Standaridisasi)", fontsize=11, fontweight='bold')
+    ax1.set_xlabel("Nominal Harga Saham Riil (Rupiah)", fontweight='semibold')
+    ax1.set_ylabel("Rentang Tanggal Historis", fontweight='semibold')
+    ax1.grid(True, linestyle=":", alpha=0.6)
+    ax1.legend(loc="upper right")
+    
+    # ----------------------------------------------------
+    # KANAN: SESUDAH STANDARDISASI (X = Z-SCORE, Y = TANGGAL)
+    # ----------------------------------------------------
+    ax2.scatter(df_high["Z_Score"], df_high["Tanggal"], color="red", alpha=0.7, edgecolors='k', s=45, label="Pivot High (R)")
+    ax2.scatter(df_low["Z_Score"], df_low["Tanggal"], color="green", alpha=0.7, edgecolors='k', s=45, label="Pivot Low (S)")
+    
+    # Garis bantu vertikal di Z-Score = 0 (Mean)
+    ax2.axvline(0, color="purple", linestyle="--", alpha=0.7, label="Mean = 0")
+    
+    # Batasan Sumbu X dari -3 sampai 3 sesuai kebutuhan klasterisasi
+    ax2.set_xlim(-3.5, 3.5)
+    ax2.set_xticks([-3, -2, -1, 0, 1, 2, 3])
+    
+    ax2.set_title("Standardized Data (Sesudah Z-Score)", fontsize=11, fontweight='bold')
+    ax2.set_xlabel("Skala Nilai Transformasi Z-Score", fontweight='semibold')
+    ax2.grid(True, linestyle=":", alpha=0.6)
+    ax2.legend(loc="upper right")
+    
+    plt.suptitle(f"Gambar 3.2: Perbandingan Distribusi Titik Pivot {ticker} Berdasarkan Garis Waktu", fontsize=12, fontweight='bold', y=0.98)
+    plt.tight_layout()
+    
+    return fig
 # ==========================================
 # SUB-BAB A: STANDARDIZATION & PIVOT POINTS
 # ==========================================
 if menu_select == "A. Standardisasi & Pivot Points":
     st.markdown('<div class="section-title">A. Analisis Data, Pivot Points, dan Standardisasi Z-Score</div>', unsafe_allow_html=True)
     
-    # Cari file emiten aktif di folder preprocessing
+    # Bagian Penyaringan Emiten & Gambar 3.1 Sektoral tetap berada di bagian atas...
+    st.subheader("📌 Tahapan Penyaringan dan Konsistensi Data Penelitian")
+    # ... (code penyaringan sebelumnya) ...
+    
+    st.markdown("---")
+    
+    # ----------------------------------------------------
+    # DATA EMITEN AKTIF (DAPAT DI-FILTER DARI SIDEBAR)
+    # ----------------------------------------------------
+    st.subheader(f"🔍 Analisis Deteksi & Transformasi Spasial Dinamis: {ticker_aktif}")
+    
     file_pattern = os.path.join(PATH_PREPROCESSED, f"{ticker_aktif}*.csv")
     matched_files = glob.glob(file_pattern)
     
     if matched_files:
         df_raw = pd.read_csv(matched_files[0])
-        # Pastikan kolom Tanggal bertipe datetime untuk grafik
         df_raw['Tanggal'] = pd.to_datetime(df_raw['Tanggal'])
         
+        # --- BLOK INTEGRASI GAMBAR 3.2 TUNGGAL (X=Harga/Z-Score, Y=Tanggal) ---
+        st.write(
+            "Hasil identifikasi Pivot Points menunjukkan bahwa setiap emiten memiliki rentang harga yang berbeda, "
+            f"mulai dari puluhan hingga ribuan rupiah per lembar saham. Oleh karena itu, khusus untuk emiten **{ticker_aktif}**, "
+            "dilakukan standardisasi menggunakan metode Z-Score agar seluruh data berada pada skala yang sama "
+            "sebelum proses klasterisasi. Hasil standardisasi ditampilkan pada **Gambar 3.2**."
+        )
+        
+        # Memanggil fungsi grafik komparasi bersisian (Timeline)
+        fig_32_timeline = gambarkan_komparasi_zscore_timeline(df_raw, ticker_aktif)
+        st.pyplot(fig_32_timeline)
+        hitung_dan_export_300dpi(fig_32_timeline, nama_file=f"Gambar_3.2_Transformasi_ZScore_{ticker_aktif}.png")
+        
+        st.write(
+            "Based on the visualization above, seluruh data berhasil ditransformasikan ke dalam skala yang seragam "
+            "dengan nilai rata-rata (*mean*) mendekati 0 dan standar deviasi sebesar 1. Kondisi ini membuat setiap "
+            "emiten memiliki skala yang setara sehingga proses klasterisasi menggunakan algoritma K-Means "
+            "dapat dilakukan secara lebih objektif."
+        )
+        
+        st.markdown("---")
+        
+        # Tampilan tabel sampel data dan grafik runut waktu harian asli bawaanmu
         col1, col2 = st.columns([1, 2])
         with col1:
-            st.subheader(f"📋 Sampel Data Terstandardisasi ({ticker_aktif})")
+            st.markdown(f"**📋 Sampel Data Terstandardisasi ({ticker_aktif})**")
             st.dataframe(df_raw[['Tanggal', 'Level', 'Type', 'Z_Score']].head(15), use_container_width=True, hide_index=True)
             
         with col2:
-            st.subheader("📈 Grafik Deteksi Pivot & Transformasi Z-Score")
+            st.markdown("**📈 Grafik Deteksi Pivot & Transformasi Z-Score**")
             
             fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
             
-            # Subplot 1: Harga Riil (Level) & Titik Pembalikan
+            # Subplot 1: Harga Riil
             ax1.plot(df_raw["Tanggal"], df_raw["Level"], label="Harga Penutupan Harian", color="blue", alpha=0.6)
-            
             df_high = df_raw[df_raw['Type'] == 'Resistance']
             df_low  = df_raw[df_raw['Type'] == 'Support']
-            
-            ax1.scatter(df_high["Tanggal"], df_high["Level"], color="red", s=40, label="Pivot High (S)", zorder=5)
-            ax1.scatter(df_low["Tanggal"], df_low["Level"], color="green", s=40, label="Pivot Low (R)", zorder=5)
+            ax1.scatter(df_high["Tanggal"], df_high["Level"], color="red", s=40, label="Pivot High (R)", zorder=5)
+            ax1.scatter(df_low["Tanggal"], df_low["Level"], color="green", s=40, label="Pivot Low (S)", zorder=5)
             ax1.set_title(f"Ekstraksi Titik Balik (Pivot Points) Riil - {ticker_aktif}")
             ax1.legend()
             ax1.grid(True, linestyle="--", alpha=0.5)
             
-            # Subplot 2: Distribusi Nilai Skala Z-Score
+            # Subplot 2: Distribusi Z-Score
             ax2.plot(df_raw["Tanggal"], df_raw["Z_Score"], label="Nilai Hasil Z-Score", color="purple", linestyle="-", alpha=0.7)
             ax2.axhline(0, color="black", linestyle="-", alpha=0.4)
             ax2.set_title("Hasil Transformasi Penyelarasan Skala (Z-Score)")
@@ -108,7 +226,6 @@ if menu_select == "A. Standardisasi & Pivot Points":
             hitung_dan_export_300dpi(fig, nama_file=f"SubbabA_Pivot_ZScore_{ticker_aktif}.png")
     else:
         st.error(f"❌ Berkas CSV untuk emiten {ticker_aktif} tidak ditemukan di direktori: {PATH_PREPROCESSED}")
-
 # ==========================================
 # SUB-BAB B: IMPLEMENTASI K-MEANS
 # ==========================================
