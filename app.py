@@ -147,6 +147,357 @@ def gambarkan_komparasi_zscore_timeline(df_raw, ticker):
     plt.tight_layout()
     
     return fig
+
+def gambarkan_variasi_k_inertia(df_cluster, ticker, k_val):
+    """ Fungsi untuk Gambar 3.3: Menampilkan data titik pivot dalam runut waktu (Y=Tanggal/Bulan)
+        terhadap skala Z-Score (X=Skala) dengan urutan warna kelompok yang KONSISTEN dan KONTRAS """
+    import matplotlib.patches as patches
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+    
+    # Ambil data khusus untuk titik pivot (Support & Resistance)
+    df_pivot = df_cluster[df_cluster['Type'].isin(['Support', 'Resistance'])].copy()
+    if df_pivot.empty:
+        df_pivot = df_cluster.copy()
+        
+    # Pastikan kolom Tanggal bertipe datetime
+    df_pivot['Tanggal'] = pd.to_datetime(df_pivot['Tanggal'])
+    df_pivot = df_pivot.sort_values('Tanggal')
+    
+    x_data = df_pivot["Z_Score"].values
+    y_data = df_pivot["Tanggal"].values
+    cluster_labels = df_pivot["Cluster"].values
+    
+    # PALET WARNA KONSISTEN & KONTRAS (Kunci dari Kelompok 1 s/d 10)
+    # Memakai warna-warna tegas HEX agar kontrasnya terjaga dan tidak membingungkan
+    WARNA_KONSISTEN = [
+        "#1E3A8A", # 1. Biru Tua
+        "#10B981", # 2. Hijau Emerald
+        "#F59E0B", # 3. Oranye Kuning
+        "#EF4444", # 4. Merah Terang
+        "#8B5CF6", # 5. Ungu Murni
+        "#EC4899", # 6. Pink Merona
+        "#06B6D4", # 7. Cyan/Biru Langit
+        "#6B7280", # 8. Abu-abu Gelap
+        "#78350F", # 9. Cokelat Tanah
+        "#111827"  # 10. Hitam Arang
+    ]
+    
+    # 1. Plot titik data dan highlight area secara konsisten berurutan
+    for c in range(k_val):
+        mask = cluster_labels == c
+        if np.any(mask):
+            warna_aktif = WARNA_KONSISTEN[c]
+            
+            # Scatter plot titik data anggota klaster
+            ax.scatter(x_data[mask], y_data[mask], 
+                       color=warna_aktif, alpha=0.85, edgecolors='black', linewidths=0.7, s=55, 
+                       label=f"Kelompok {c+1}", zorder=3)
+            
+            # 2. Tambahkan HIGHLIGHT AREA (Kotak Arsiran) dengan warna yang identik tapi sangat transparan (alpha=0.07)
+            min_date, max_date = np.min(y_data), np.max(y_data)
+            min_x, max_x = np.min(x_data[mask]), np.max(x_data[mask])
+            
+            # Kotak pembatas wilayah spasial klaster ke-c
+            rect = patches.Rectangle(
+                (min_x - 0.08, min_date), 
+                (max_x - min_x + 0.16), 
+                (max_date - min_date), 
+                linewidth=1.2, 
+                linestyle='--', 
+                edgecolor=warna_aktif, 
+                facecolor=warna_aktif, 
+                alpha=0.07,  # Dibuat tipis agar jika ada overlay/irisan tipis tetap kontras dan bersih
+                zorder=1
+            )
+            ax.add_patch(rect)
+    
+    # Atur tampilan layout grid dan batasan sumbu
+    ax.set_title(f"Visualisasi Pembagian Kluster Titik Pivot (K={k_val})", fontsize=11, fontweight='bold', pad=12)
+    ax.set_xlabel("Skala Nilai Fitur Hasil Standardisasi Z-Score", fontweight='semibold')
+    ax.set_ylabel("Rentang Tanggal History", fontweight='semibold')
+    
+    ax.set_xlim(-3.5, 3.5)
+    ax.set_xticks([-3, -2, -1, 0, 1, 2, 3])
+    
+    ax.grid(True, linestyle=":", alpha=0.5)
+    
+    # Tempatkan legend di luar kanan grafik agar rapi dan tidak menutupi data harian
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), title="Daftar Kelompok", title_fontproperties={'weight':'bold'})
+    
+    plt.tight_layout()
+    return fig
+
+def gambarkan_sebaran_dan_centroid(df_cluster, ticker, k_val):
+    """ Fungsi untuk Gambar 3.4: Menampilkan sebaran data Pivot Points pada garis waktu (Y=Tanggal)
+        terhadap skala Z-Score (X) lengkap dengan garis vertikal penanda posisi Centroid kelompok """
+    fig, ax = plt.subplots(figsize=(8, 5.5))
+    
+    # Ambil data khusus untuk titik pivot (Support & Resistance)
+    df_pivot = df_cluster[df_cluster['Type'].isin(['Support', 'Resistance'])].copy()
+    if df_pivot.empty:
+        df_pivot = df_cluster.copy()
+        
+    # Pastikan kolom Tanggal bertipe datetime
+    df_pivot['Tanggal'] = pd.to_datetime(df_pivot['Tanggal'])
+    df_pivot = df_pivot.sort_values('Tanggal')
+    
+    x_data = df_pivot["Z_Score"].values
+    y_data = df_pivot["Tanggal"].values
+    cluster_labels = df_pivot["Cluster"].values
+    
+    # Gunakan palet warna yang sama persis dengan Gambar 3.3 agar konsisten
+    WARNA_KONSISTEN = ["#1E3A8A", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6", "#EC4899", "#06B6D4", "#6B7280", "#78350F", "#111827"]
+    
+    # 1. Plot sebaran titik data berdasarkan klaster pada garis waktu
+    for c in range(k_val):
+        mask = cluster_labels == c
+        if np.any(mask):
+            ax.scatter(x_data[mask], y_data[mask], 
+                       color=WARNA_KONSISTEN[c], alpha=0.4, edgecolors='none', s=45, zorder=2)
+            
+    # 2. Hitung posisi koordinat Centroid (rata-rata nilai Z-Score per kelompok)
+    centroids = df_pivot.groupby('Cluster')['Z_Score'].mean().reset_index()
+    min_date, max_date = np.min(y_data), np.max(y_data)
+    
+    # 3. Gambar garis vertikal tegak lurus untuk posisi setiap Centroid
+    for _, row in centroids.iterrows():
+        c_idx = int(row['Cluster'])
+        if c_idx < len(WARNA_KONSISTEN):
+            warna_centroid = WARNA_KONSISTEN[c_idx]
+            
+            # Tarik garis vertikal putus-putus tebal memotong seluruh linimasa tanggal
+            ax.axvline(x=row['Z_Score'], color=warna_centroid, linestyle='-.', linewidth=1.8, 
+                       label=f"Garis Centroid Klaster {c_idx+1}", zorder=4)
+            
+            # Beri penanda 'X' besar di bagian tengah garis waktu untuk mempertegas posisi pusatnya
+            tengah_index = len(y_data) // 2
+            ax.scatter(row['Z_Score'], y_data[tengah_index], color=warna_centroid, marker="X", 
+                       s=150, edgecolors='black', linewidths=1.2, zorder=5)
+
+    # Atur tampilan layout grid dan batasan sumbu
+    ax.set_title(f"Gambar 3.4: Ekstraksi Posisi Garis Centroid K-Means (K={k_val}) - {ticker}", fontsize=11, fontweight='bold', pad=12)
+    ax.set_xlabel("Skala Nilai Fitur Hasil Standardisasi Z-Score", fontweight='semibold')
+    ax.set_ylabel("Rentang Tanggal Historis", fontweight='semibold')
+    
+    ax.set_xlim(-3.5, 3.5)
+    ax.set_xticks([-3, -2, -1, 0, 1, 2, 3])
+    
+    ax.grid(True, linestyle=":", alpha=0.5)
+    
+    # Posisikan legend di luar kanan agar tidak menutupi chart historis saham
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), title="Referensi Pusat", title_fontproperties={'weight':'bold'})
+    
+    plt.tight_layout()
+    return fig
+
+def gambarkan_311_centroid_timeline(df_cluster, ticker, k_val, tipe_aktif="Support"):
+    """ Gambar 3.11: Menampilkan sebaran data titik pivot berdasarkan Garis Waktu 
+        dan posisi Titik Centroid-nya (X=Z-Score, Y=Tanggal) """
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    
+    # Filter tipe data berdasarkan pilihan user (Support, Resistance, atau Keduanya)
+    if tipe_aktif == "Keduanya":
+        df_pivot = df_cluster[df_cluster['Type'].isin(['Support', 'Resistance'])].copy()
+    else:
+        df_pivot = df_cluster[df_cluster['Type'] == tipe_aktif].copy()
+        
+    if df_pivot.empty: 
+        df_pivot = df_cluster.copy()
+        
+    df_pivot['Tanggal'] = pd.to_datetime(df_pivot['Tanggal'])
+    df_pivot = df_pivot.sort_values('Tanggal')
+    
+    # Palet warna yang dikunci berdasarkan tipe data dan ID klaster agar konsisten
+    WARNA_SUPPORT = ["#10B981", "#059669", "#047857", "#065F46", "#022C22", "#34D399", "#6EE7B7", "#A7F3D0", "#D1FAE5", "#ECFDF5"]
+    WARNA_RESIST = ["#2563EB", "#1D4ED8", "#1E40AF", "#1E3A8A", "#172554", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE", "#EFF6FF"]
+    
+    # 1. Plot Sebaran Titik Data
+    for c in range(k_val):
+        mask_c = df_pivot["Cluster"] == c
+        
+        if tipe_aktif == "Keduanya" or tipe_aktif == "Support":
+            mask_s = mask_c & (df_pivot["Type"] == "Support")
+            if np.any(mask_s):
+                ax.scatter(df_pivot["Z_Score"][mask_s], df_pivot["Tanggal"][mask_s], 
+                           color=WARNA_SUPPORT[c % 10], alpha=0.5, edgecolors='none', s=45, label=f"Support {c+1}")
+                           
+        if tipe_aktif == "Keduanya" or tipe_aktif == "Resistance":
+            mask_r = mask_c & (df_pivot["Type"] == "Resistance")
+            if np.any(mask_r):
+                ax.scatter(df_pivot["Z_Score"][mask_r], df_pivot["Tanggal"][mask_r], 
+                           color=WARNA_RESIST[c % 10], alpha=0.5, edgecolors='none', s=45, label=f"Resistance {c+1}")
+            
+    # 2. Plot Titik Centroid (Pusat Massa)
+    # Grouping berdasarkan Type dan Cluster secara terpisah agar koordinat matematika centroid akurat
+    centroids = df_pivot.groupby(['Type', 'Cluster'])['Z_Score'].mean().reset_index()
+    tengah_idx = len(df_pivot) // 2
+    
+    for _, row in centroids.iterrows():
+        c_idx = int(row['Cluster'])
+        t_type = row['Type']
+        warna_c = WARNA_SUPPORT[c_idx % 10] if t_type == "Support" else WARNA_RESIST[c_idx % 10]
+        
+        ax.scatter(row['Z_Score'], df_pivot["Tanggal"].values[tengah_idx], color=warna_c, marker="X", 
+                   s=160, edgecolors='black', linewidths=1.2, label=f"Centroid {t_type[:3]}-{c_idx+1}", zorder=5)
+                   
+    ax.set_title(f"Gambar 3.11: Pemetaan Positional Titik Centroid Data {tipe_aktif} - {ticker}", fontsize=11, fontweight='bold', pad=12)
+    ax.set_xlabel("Skala Nilai Fitur Hasil Standardisasi Z-Score", fontweight='semibold')
+    ax.set_ylabel("Rentang Tanggal Historis", fontweight='semibold')
+    ax.set_xlim(-3.5, 3.5)
+    ax.set_xticks([-3, -2, -1, 0, 1, 2, 3])
+    ax.grid(True, linestyle=":", alpha=0.5)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), title="Keterangan")
+    plt.tight_layout()
+    return fig
+
+def gambarkan_312_min_max_development(df_cluster, ticker, k_val, tipe_aktif="Support"):
+    """ Gambar 3.12: Mengembangkan Gambar 3.11 dengan menambahkan batas rentang internal Min & Max 
+        hasil perhitungan standar deviasi klaster secara independen (X=Z-Score, Y=Tanggal) """
+    import matplotlib.patches as patches
+    fig, ax = plt.subplots(figsize=(8.5, 5.5))
+    
+    if tipe_aktif == "Keduanya":
+        df_pivot = df_cluster[df_cluster['Type'].isin(['Support', 'Resistance'])].copy()
+    else:
+        df_pivot = df_cluster[df_cluster['Type'] == tipe_aktif].copy()
+        
+    if df_pivot.empty: 
+        df_pivot = df_cluster.copy()
+        
+    df_pivot['Tanggal'] = pd.to_datetime(df_pivot['Tanggal'])
+    df_pivot = df_pivot.sort_values('Tanggal')
+    
+    WARNA_SUPPORT = ["#10B981", "#059669", "#047857", "#065F46", "#022C22", "#34D399", "#6EE7B7", "#A7F3D0", "#D1FAE5", "#ECFDF5"]
+    WARNA_RESIST = ["#2563EB", "#1D4ED8", "#1E40AF", "#1E3A8A", "#172554", "#60A5FA", "#93C5FD", "#BFDBFE", "#DBEAFE", "#EFF6FF"]
+    min_date, max_date = np.min(df_pivot["Tanggal"]), np.max(df_pivot["Tanggal"])
+    
+    # 1. Plot Sebaran Titik Data & Highlight Rentang Batas
+    for c in range(k_val):
+        mask_c = df_pivot["Cluster"] == c
+        
+        # Sub-proses untuk data Support
+        if tipe_aktif == "Keduanya" or tipe_aktif == "Support":
+            mask_s = mask_c & (df_pivot["Type"] == "Support")
+            if np.any(mask_s):
+                warna_s = WARNA_SUPPORT[c % 10]
+                ax.scatter(df_pivot["Z_Score"][mask_s], df_pivot["Tanggal"][mask_s], color=warna_s, alpha=0.35, edgecolors='none', s=45)
+                min_xs, max_xs = np.min(df_pivot["Z_Score"][mask_s]), np.max(df_pivot["Z_Score"][mask_s])
+                rect_s = patches.Rectangle((min_xs, min_date), (max_xs - min_xs), (max_date - min_date), 
+                                          linewidth=1.0, linestyle='--', edgecolor=warna_s, facecolor=warna_s, alpha=0.06)
+                ax.add_patch(rect_s)
+                ax.axvline(x=min_xs, color=warna_s, linestyle=':', alpha=0.4, linewidth=1.0)
+                ax.axvline(x=max_xs, color=warna_s, linestyle=':', alpha=0.4, linewidth=1.0)
+                
+        # Sub-proses untuk data Resistance
+        if tipe_aktif == "Keduanya" or tipe_aktif == "Resistance":
+            mask_r = mask_c & (df_pivot["Type"] == "Resistance")
+            if np.any(mask_r):
+                warna_r = WARNA_RESIST[c % 10]
+                ax.scatter(df_pivot["Z_Score"][mask_r], df_pivot["Tanggal"][mask_r], color=warna_r, alpha=0.35, edgecolors='none', s=45)
+                min_xr, max_xr = np.min(df_pivot["Z_Score"][mask_r]), np.max(df_pivot["Z_Score"][mask_r])
+                rect_r = patches.Rectangle((min_xr, min_date), (max_xr - min_xr), (max_date - min_date), 
+                                          linewidth=1.0, linestyle='--', edgecolor=warna_r, facecolor=warna_r, alpha=0.06)
+                ax.add_patch(rect_r)
+                ax.axvline(x=min_xr, color=warna_r, linestyle=':', alpha=0.4, linewidth=1.0)
+                ax.axvline(x=max_xr, color=warna_r, linestyle=':', alpha=0.4, linewidth=1.0)
+
+    # 2. Plot Titik Centroid Berlabel di Atas Overlay
+    centroids = df_pivot.groupby(['Type', 'Cluster'])['Z_Score'].mean().reset_index()
+    tengah_idx = len(df_pivot) // 2
+    for _, row in centroids.iterrows():
+        c_idx = int(row['Cluster'])
+        t_type = row['Type']
+        warna_c = WARNA_SUPPORT[c_idx % 10] if t_type == "Support" else WARNA_RESIST[c_idx % 10]
+        ax.scatter(row['Z_Score'], df_pivot["Tanggal"].values[tengah_idx], color=warna_c, marker="X", 
+                   s=140, edgecolors='black', linewidths=1.2, label=f"Batas {t_type[:3]}-{c_idx+1}", zorder=5)
+                   
+    ax.set_title(f"Gambar 3.12: Formasi Batas Perluasan Rentang (Min/Max) Data {tipe_aktif} - {ticker}", fontsize=11, fontweight='bold', pad=12)
+    ax.set_xlabel("Skala Nilai Fitur Hasil Standardisasi Z-Score", fontweight='semibold')
+    ax.set_ylabel("Rentang Tanggal Historis", fontweight='semibold')
+    ax.set_xlim(-3.5, 3.5)
+    ax.set_xticks([-3, -2, -1, 0, 1, 2, 3])
+    ax.grid(True, linestyle=":", alpha=0.5)
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), title="Batas Zona")
+    plt.tight_layout()
+    return fig
+
+def gambarkan_313_zona_rupiah_aktual(df_raw, df_zona, ticker, k_val):
+    """ Gambar 3.13 (Terupdate): Visualisasi Tren Harga Saham Riil dengan Arsiran Area 
+        S&R Lengkap dengan Keterangan Nama Zona dan Rentang Nominal Rupiah Dinamis """
+    fig, ax = plt.subplots(figsize=(12, 6.5)) # Ukuran dilebarkan sedikit agar teks muat rapi
+    
+    df_raw['Tanggal'] = pd.to_datetime(df_raw['Tanggal'])
+    df_raw = df_raw.sort_values('Tanggal')
+    
+    # Plot Garis Harga Saham Aktual
+    ax.plot(df_raw["Tanggal"], df_raw["Level"], color="black", linewidth=1.2, label="Harga Saham Aktual", alpha=0.85, zorder=2)
+    
+    # Ambil tanggal paling ujung kanan untuk posisi penempatan teks keterangan zona
+    tanggal_maksimal = df_raw["Tanggal"].max()
+    
+    # Counter untuk penomoran urutan zona (diurutkan dari harga terendah ke tertinggi)
+    # Urutkan df_zona berdasarkan nilai Centroid_Price agar penomoran zona 1, 2, 3 konsisten runtut
+    df_zona_sorted = df_zona.sort_values('Centroid_Price').reset_index(drop=True)
+    
+    support_idx = 1
+    resistance_idx = 1
+    
+    support_labeled = False
+    resistance_labeled = False
+    
+    for _, row in df_zona_sorted.iterrows():
+        min_p = int(row['Min'])
+        max_p = int(row['Max'])
+        center_p = int(row['Centroid_Price'])
+        
+        if row['Type'] == 'Resistance':
+            label_r = "Zona Resistance (Batas Atas)" if not resistance_labeled else ""
+            resistance_labeled = True
+            
+            # 1. Gambar arsiran area merah
+            ax.axhspan(min_p, max_p, color='red', alpha=0.13, label=label_r, zorder=1)
+            # 2. Gambar garis tengah Centroid
+            ax.axhline(center_p, color='red', linestyle='--', alpha=0.4, linewidth=1.0, zorder=1)
+            
+            # 3. TAMBAHAN: Tulis Teks Keterangan Zona Resistance di ujung kanan grafik
+            teks_label = f"Resistance {resistance_idx}\n({min_p} - {max_p})"
+            ax.text(tanggal_maksimal, center_p, teks_label, color="#991B1B", 
+                    fontsize=8.5, fontweight='bold', va='center', ha='left',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=2))
+            
+            resistance_idx += 1
+            
+        elif row['Type'] == 'Support':
+            label_s = "Zona Support (Batas Bawah)" if not support_labeled else ""
+            support_labeled = True
+            
+            # 1. Gambar arsiran area hijau
+            ax.axhspan(min_p, max_p, color='green', alpha=0.13, label=label_s, zorder=1)
+            # 2. Gambar garis tengah Centroid
+            ax.axhline(center_p, color='green', linestyle='--', alpha=0.4, linewidth=1.0, zorder=1)
+            
+            # 3. TAMBAHAN: Tulis Teks Keterangan Zona Support di ujung kanan grafik
+            teks_label = f"Support {support_idx}\n({min_p} - {max_p})"
+            ax.text(tanggal_maksimal, center_p, teks_label, color="#065F46", 
+                    fontsize=8.5, fontweight='bold', va='center', ha='left',
+                    bbox=dict(facecolor='white', alpha=0.7, edgecolor='none', pad=2))
+            
+            support_idx += 1
+            
+    ax.set_title(f"Gambar 3.13: Pemetaan Rentang Zona Dinamis S&R Konversi Rupiah (K={k_val}) - {ticker}", fontsize=11, fontweight='bold', pad=12)
+    ax.set_xlabel("Rentang Linimasa Tanggal Historis", fontweight='semibold')
+    ax.set_ylabel("Nominal Harga Saham Riil (Rupiah)", fontweight='semibold')
+    
+    # Berikan ruang tambahan di sebelah kanan sumbu X agar teks keterangan tidak terpotong bingkai
+    import matplotlib.dates as mdates
+    rentang_waktu = (max_date := df_raw["Tanggal"].max()) - df_raw["Tanggal"].min()
+    ax.set_xlim(df_raw["Tanggal"].min(), df_raw["Tanggal"].max() + rentang_waktu * 0.12)
+    
+    ax.legend(loc="upper left")
+    ax.grid(True, linestyle="--", alpha=0.3)
+    
+    plt.tight_layout()
+    return fig
 # ==========================================
 # SUB-BAB A: STANDARDIZATION & PIVOT POINTS
 # ==========================================
@@ -227,11 +578,12 @@ if menu_select == "A. Standardisasi & Pivot Points":
     else:
         st.error(f"❌ Berkas CSV untuk emiten {ticker_aktif} tidak ditemukan di direktori: {PATH_PREPROCESSED}")
 # ==========================================
-# SUB-BAB B: IMPLEMENTASI K-MEANS
+# SUB-BAB B: IMPLEMENTASI K-MEANS & CENTROID
 # ==========================================
 elif menu_select == "B. Implementasi K-Means & Centroid":
-    st.markdown('<div class="section-title">B. Implementasi Klasterisasi K-Means</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">B. Implementasi Klasterisasi K-Means & Ekstraksi Centroid</div>', unsafe_allow_html=True)
     
+    # Slider kontrol dinamis dari sidebar asli kamu
     k_select = st.sidebar.slider("Pilih Nilai K untuk melihat Posisi Centroid:", 2, 10, 4)
     
     # Membaca data detail clustering hasil K-Means per nilai K yang dipilih
@@ -241,68 +593,179 @@ elif menu_select == "B. Implementasi K-Means & Centroid":
     if matched_files:
         df_cluster = pd.read_csv(matched_files[0])
         
-        st.subheader(f"📍 Distribusi Data Hasil Klasterisasi K={k_select} pada Ruang Fitur Z-Score ({ticker_aktif})")
+        # ----------------------------------------------------
+        # SEKSYEN GAMBAR 3.3: VARIASI NILAI K (DINAMIS S/D K=10)
+        # ----------------------------------------------------
+        st.subheader("⚙️ Pengujian Struktur Variasi Jumlah Klaster (K)")
+        st.write(
+            "Proses klasterisasi dilakukan dengan menguji variasi jumlah klaster (K) dari 2 hingga 10 "
+            "menggunakan algoritma K-Means pada data Support dan Resistance secara terpisah. Setiap variasi "
+            "nilai K dievaluasi untuk melihat hasil pengelompokan data yang terbentuk. Hasil pengujian "
+            "tersebut ditampilkan pada **Gambar 3.3**."
+        )
         
-        fig_c, ax_c = plt.subplots(figsize=(10, 4))
-        # Plot sebaran data asli yang sudah di-cluster oleh program kamu
-        sns.stripplot(data=df_cluster, x="Z_Score", hue="Cluster", palette="Set1", ax=ax_c, size=7, alpha=0.7)
+        # Sekarang melemparkan k_select (2 sampai 10) dari slider sidebar secara interaktif
+        fig_33 = gambarkan_variasi_k_inertia(df_cluster, ticker_aktif, k_select)
+        st.pyplot(fig_33)
+        hitung_dan_export_300dpi(fig_33, nama_file=f"Gambar_3.3_Proses_Klasterisasi_K{k_select}_{ticker_aktif}.png")
         
-        ax_c.set_xlabel("Skala Nilai Fitur Z-Score")
-        ax_c.set_title(f"Sebaran Keanggotaan Objek Data terhadap Klaster K={k_select}")
-        ax_c.grid(True, linestyle=":", alpha=0.5)
+        st.write(
+            f"Berdasarkan **Gambar 3.3**, visualisasi di atas memperlihatkan bagaimana sebaran titik *Pivot Points* "
+            f"pada emiten **{ticker_aktif}** yang dipetakan berdasarkan garis waktu kronologis (sumbu vertikal kiri) "
+            f"dan nilai skala hasil standardisasi Z-Score (sumbu horizontal bawah). Pada pengujian interaktif dengan jumlah "
+            f"klaster **K={k_select}**, sistem secara otomatis membagi sebaran titik balik ke dalam **{k_select} kelompok wilayah** "
+            f"yang ditandai dengan kotak *highlight* arsiran warna terpisah."
+        )
+        st.write(
+            f"Ketika Anda mengubah nilai K di sidebar dari K=2 hingga K=10, Anda dapat mengamati secara langsung bahwa "
+            f"semakin besar nilai K yang dipilih, semakin banyak blok kelompok atau kotak *highlight* baru yang terbentuk "
+            f"membelah rentang spasial tersebut, sehingga sebaran data pembalikan harga menjadi jauh lebih rinci dan spesifik. "
+            f"Hasil eksperimen ini membuktikan bahwa perubahan nilai K secara langsung memengaruhi tingkat kerincian kerapatan "
+            f"struktur klaster yang dihasilkan dan menjadi fondasi utama dalam menentukan jumlah klaster terbaik saat evaluasi model."
+        )
         
-        st.pyplot(fig_c)
-        hitung_dan_export_300dpi(fig_c, nama_file=f"SubbabB_Sebaran_Klaster_K{k_select}_{ticker_aktif}.png")
+        st.markdown("---")
+        # ----------------------------------------------------
+        # SEKSYEN GAMBAR 3.4: SEBARAN DATA & POSISI CENTROID
+        # ----------------------------------------------------
+        st.subheader("📍 Pemetaan Lokasi Centroid Ruang Spasial Z-Score")
+        # ... (Sisa kode Gambar 3.4 yang menampilkan tanda 'X' besar sebagai centroid tetap di bawahnya) ...
+        st.write(
+            "Hasil proses K-Means menghasilkan titik pusat (*centroid*) yang mewakili setiap kelompok data "
+            "berdasarkan kedekatan antar-Pivot Points. Setelah proses klasterisasi selesai, setiap data menjadi "
+            "anggota dari kelompok yang memiliki *centroid* terdekat. Sebaran data dan posisi *centroid* ditampilkan "
+            "pada **Gambar 3.4**."
+        )
+        
+        fig_34 = gambarkan_sebaran_dan_centroid(df_cluster, ticker_aktif, k_select)
+        st.pyplot(fig_34)
+        hitung_dan_export_300dpi(fig_34, nama_file=f"Gambar_3.4_Centroid_Klaster_K{k_select}_{ticker_aktif}.png")
+        
+        st.write(
+            "Berdasarkan gambar tersebut, data Pivot Points berhasil dikelompokkan ke dalam klaster masing-masing "
+            "dengan posisi *centroid* yang merepresentasikan pusat dari setiap kelompok. Hasil ini menjadi dasar "
+            "dalam pembentukan rentang zona Support dan Resistance pada tahap berikutnya."
+        )
+        
+        # Teks Narasi Pendukung Tambahan Bab III
+        st.write(
+            "Hasil klasterisasi menunjukkan bahwa posisi *centroid* terbentuk mengikuti sebaran data Pivot Points "
+            "pada setiap kelompok. Semakin banyak titik data yang berada pada suatu rentang nilai, semakin dekat "
+            "posisi *centroid* dengan pusat sebaran data tersebut. Kondisi ini menunjukkan bahwa *centroid* dapat "
+            "merepresentasikan area yang memiliki konsentrasi titik balik harga lebih tinggi dibandingkan area lainnya. "
+            "Oleh karena itu, *centroid* digunakan sebagai acuan dalam pembentukan rentang zona Support dan Resistance "
+            "pada tahap selanjutnya."
+        )
+        st.write(
+            "Hasil klasterisasi juga menunjukkan bahwa proses pengelompokan dapat dilakukan secara konsisten "
+            "meskipun setiap emiten memiliki rentang harga yang berbeda. Hal ini karena seluruh data telah melalui "
+            "proses standardisasi Z-Score sehingga berada pada skala yang sama. Nilai *centroid* yang dihasilkan "
+            "dari setiap klaster kemudian digunakan sebagai dasar dalam pembentukan batas bawah (Min) dan batas "
+            "atas (Max) untuk membentuk zona Support dan Resistance pada tahap selanjutnya."
+        )
+        
     else:
         st.error(f"❌ Berkas detail klaster K={k_select} untuk {ticker_aktif} tidak ditemukan di: {PATH_CLUSTERING}")
-
 # ==========================================
 # SUB-BAB C: PEMETAAN ZONA RENTANG DINAMIS
 # ==========================================
 elif menu_select == "C. Pemetaan Zona Rentang Dinamis":
     st.markdown('<div class="section-title">C. Pemetaan Zona Rentang Dinamis (Batas Spasial Internal)</div>', unsafe_allow_html=True)
     
+    # Slider Pilihan K terintegrasi dari sidebar asli kamu
     k_select = st.sidebar.slider("Pilih Nilai K untuk Visualisasi Zona:", 2, 10, 4)
     
-    # Membaca berkas summary_zona hasil perhitungan rumus Min/Max kamu
-    file_pattern = os.path.join(PATH_CLUSTERING, f"k{k_select}", "summary_zona", f"{ticker_aktif}*.csv")
-    matched_files = glob.glob(file_pattern)
+    # Membaca berkas klaster detail dan summary_zona hasil perhitungan rumus Min/Max kamu
+    file_pattern_detail = os.path.join(PATH_CLUSTERING, f"k{k_select}", "detail", f"{ticker_aktif}*.csv")
+    file_pattern_zona   = os.path.join(PATH_CLUSTERING, f"k{k_select}", "summary_zona", f"{ticker_aktif}*.csv")
+    file_raw_pattern     = os.path.join(PATH_PREPROCESSED, f"{ticker_aktif}*.csv")
     
-    # Membaca data harga dasar sebagai background grafik
-    file_raw_pattern = os.path.join(PATH_PREPROCESSED, f"{ticker_aktif}*.csv")
-    matched_raw = glob.glob(file_raw_pattern)
+    matched_detail = glob.glob(file_pattern_detail)
+    matched_zona   = glob.glob(file_pattern_zona)
+    matched_raw    = glob.glob(file_raw_pattern)
     
-    if matched_files and matched_raw:
-        df_zona = pd.read_csv(matched_files[0])
-        df_raw  = pd.read_csv(matched_raw[0])
-        df_raw['Tanggal'] = pd.to_datetime(df_raw['Tanggal'])
+    if matched_detail and matched_zona and matched_raw:
+        df_cluster = pd.read_csv(matched_detail[0])
+        df_zona    = pd.read_csv(matched_zona[0])
+        df_raw     = pd.read_csv(matched_raw[0])
         
-        st.subheader(f"🛡️ Plot Batas Area Ruang Spasial Dinamis (Min/Max Area) - K={k_select}")
+        # Pilihan sub-tipe filter khusus untuk Gambar 3.11 & 3.12 agar tidak bertumpuk
+        tipe_visual = st.radio("Tinjau Komponen Struktur Fitur:", ["Support", "Resistance", "Keduanya"], horizontal=True)
         
-        fig_z, ax_z = plt.subplots(figsize=(12, 6))
-        ax_z.plot(df_raw["Tanggal"], df_raw["Level"], color="black", linewidth=1.2, label="Harga Saham Aktual", alpha=0.8)
+        # ----------------------------------------------------
+        # SEKSYEN GAMBAR 3.11: POSISI CENTROID TIMELINE
+        # ----------------------------------------------------
+        st.subheader("📍 Titik Pusat (Centroid) Hasil Ekstraksi K-Means")
+        st.write(
+            "Nilai *centroid* yang diperoleh dari proses K-Means pada **Gambar 3.11** di bawah ini, "
+            "selanjutnya digunakan untuk membentuk rentang zona *Support* dan *Resistance*. Proses ini merepresentasikan "
+            "pusat akumulasi titik balik harga saham dalam ruang dimensi fitur Z-Score."
+        )
         
-        # Gambar arsiran zona Support & Resistance secara otomatis dari baris summary_zona .csv kamu
-        for index, row in df_zona.iterrows():
-            if row['Type'] == 'Resistance':
-                ax_z.axhspan(row['Min'], row['Max'], color='red', alpha=0.15, 
-                             label="Zona Resistance" if "Zona Resistance" not in ax_z.get_legend_handles_labels()[1] else "")
-                ax_z.axhline(row['Centroid_Price'], color='red', linestyle='--', alpha=0.5)
-            elif row['Type'] == 'Support':
-                ax_z.axhspan(row['Min'], row['Max'], color='green', alpha=0.15, 
-                             label="Zona Support" if "Zona Support" not in ax_z.get_legend_handles_labels()[1] else "")
-                ax_z.axhline(row['Centroid_Price'], color='green', linestyle='--', alpha=0.5)
-                
-        ax_z.set_title(f"Visualisasi Batas Spasial Dinamis pada Tren Pergerakan Saham {ticker_aktif} (K={k_select})")
-        ax_z.set_xlabel("Periode Runut Waktu")
-        ax_z.set_ylabel("Nominal Harga Saham Riil (Rupiah)")
-        ax_z.legend(loc="upper left")
-        ax_z.grid(True, linestyle="--", alpha=0.3)
+        fig_311 = gambarkan_311_centroid_timeline(df_cluster, ticker_aktif, k_select, tipe_aktif=tipe_visual)
+        st.pyplot(fig_311)
+        hitung_dan_export_300dpi(fig_311, nama_file=f"Gambar_3.11_Centroid_Timeline_{ticker_aktif}.png")
         
-        st.pyplot(fig_z)
-        hitung_dan_export_300dpi(fig_z, nama_file=f"SubbabC_Zona_BatasDinamis_K{k_select}_{ticker_aktif}.png")
+        st.markdown("---")
+        
+        # ----------------------------------------------------
+        # SEKSYEN GAMBAR 3.12: PENGEMBANGAN MIN MAX OVERLAY
+        # ----------------------------------------------------
+        st.subheader("🛡️ Pengembangan Batas Atas (Max) dan Batas Bawah (Min)")
+        st.write(
+            "Setiap *centroid* dikembangkan menjadi batas bawah (*Min*) dan batas atas (*Max*) menggunakan "
+            "standar deviasi internal dari masing-masing klaster. Hasil perhitungan tersebut kemudian dikonversi kembali "
+            "ke skala harga asli sehingga rentang zona dapat direpresentasikan dalam satuan rupiah. Proses pembentukan "
+            "batas zona ditampilkan pada **Gambar 3.12**."
+        )
+        
+        fig_312 = gambarkan_312_min_max_development(df_cluster, ticker_aktif, k_select, tipe_aktif=tipe_visual)
+        st.pyplot(fig_312)
+        hitung_dan_export_300dpi(fig_312, nama_file=f"Gambar_3.12_MinMax_Development_{ticker_aktif}.png")
+        
+        st.write(
+            "Berdasarkan **Gambar 3.12**, batas bawah (*Min*) dan batas atas (*Max*) terbentuk di sekitar posisi *centroid*, "
+            "sehingga setiap klaster tidak lagi direpresentasikan sebagai satu titik, tetapi sebagai sebuah rentang zona. "
+            "Lebar rentang yang dihasilkan menyesuaikan dengan penyebaran data pada masing-masing klaster, sehingga "
+            "setiap zona memiliki batas yang berbeda. Rentang zona inilah yang selanjutnya digunakan sebagai acuan pada proses pengujian model."
+        )
+        
+        st.markdown("---")
+        
+        # ----------------------------------------------------
+        # SEKSYEN GAMBAR 3.13: ZONA RUPIAH AKTUAL
+        # ----------------------------------------------------
+        st.subheader("📈 Hasil Akhir Pemetaan Zona Dinamis Satuan Rupiah")
+        st.write(
+            "Rentang zona yang telah diperoleh kemudian ditampilkan pada grafik pergerakan harga saham untuk memperlihatkan "
+            "posisi zona *Support* dan *Resistance* terhadap data harga aktual. Hasil visualisasi tersebut disajikan pada **Gambar 3.13**."
+        )
+        
+        fig_313 = gambarkan_313_zona_rupiah_aktual(df_raw, df_zona, ticker_aktif, k_select)
+        st.pyplot(fig_313)
+        hitung_dan_export_300dpi(fig_313, nama_file=f"Gambar_3.13_Zona_Rupiah_Aktual_{ticker_aktif}.png")
+        
+        st.write(
+            "Berdasarkan **Gambar 3.13**, pergerakan harga saham ditampilkan dalam bentuk garis, sedangkan zona *Support* "
+            "dan *Resistance* divisualisasikan sebagai area berwarna hasil perhitungan batas bawah (*Min*) dan batas atas (*Max*). "
+            "Area berwarna **hijau** menunjukkan zona *Support*, sedangkan area berwarna **merah** menunjukkan zona *Resistance*. "
+            "Visualisasi ini memperlihatkan bahwa rentang zona yang terbentuk mengikuti sebaran pergerakan harga historis "
+            "sehingga dapat digunakan sebagai acuan pada proses pengujian model."
+        )
+        
+        # Paragraf khusus Analisis K=2 (Kondisi Khusus Evaluasi Skripsi)
+        if k_select == 2:
+            st.info(
+                "💡 **Analisis Khusus Konfigurasi K=2:** Pada konfigurasi K=2, data Pivot Points terbagi menjadi dua klaster "
+                "yang merepresentasikan zona Support dan Resistance secara biner. Karena jumlah klaster yang digunakan "
+                "relatif sedikit, rentang zona yang dihasilkan cenderung lebih lebar sehingga mencakup lebih banyak titik Pivot Points. "
+                "Hasil ini menunjukkan bahwa pembentukan zona telah mengikuti sebaran data historis pada masing-masing klaster. "
+                "Rentang zona yang diperoleh selanjutnya digunakan sebagai dasar pada proses pengujian model untuk mengevaluasi "
+                "performanya dalam mengidentifikasi pergerakan harga saham sektor energi."
+            )
+            
     else:
-        st.error("❌ Kegagalan memuat file summary_zona atau file data dasar.")
+        st.error("❌ Kegagalan memuat berkas detail klaster, summary_zona, atau file data dasar preprocessing.")
 
 # ==========================================
 # SUB-BAB D: EVALUASI PERFORMA MODEL
