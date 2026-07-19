@@ -779,6 +779,13 @@ elif menu_select == "D. Evaluasi Performa Model":
         metric_file = os.path.join(PATH_EVALUATION, f"summary_metrics_k{k}.csv")
         if os.path.exists(metric_file):
             df_m = pd.read_csv(metric_file)
+            # Rename Indonesian columns to English
+            df_m = df_m.rename(columns={
+                'Akurasi_Total': 'Accuracy',
+                'Ketepatan_Prediksi': 'Precision',
+                'Daya_Tangkap_Model': 'Recall',
+                'Skor_Keseimbangan_F1': 'F1_Score'
+            })
             df_m['K_Value'] = f"K={k}"
             all_metrics.append(df_m)
             
@@ -820,14 +827,14 @@ elif menu_select == "D. Evaluasi Performa Model":
             judul_grafik = f"Grafik Komparasi Metrik Confusion Matrix ({ticker_aktif})"
             nama_file_out = f"SubbabD_Komparasi_Akurasi_{ticker_aktif}.png"
             
-        # Gambar Grafik Batang Komparasi Berdasarkan Mode yang Dipilih
-        fig_b, ax_b = plt.subplots(figsize=(10, 5))
+        # Gambar Grafik Garis Komparasi Berdasarkan Mode yang Dipilih
+        fig_b, ax_b = plt.subplots(figsize=(12, 6))
         x_indices = np.arange(len(df_plot))
-        width = 0.25
         
-        ax_b.bar(x_indices - width, df_plot["Accuracy"] * mul, width, label="Accuracy", color="#1E3A8A")
-        ax_b.bar(x_indices, df_plot["Precision"] * mul, width, label="Precision", color="#2563EB")
-        ax_b.bar(x_indices + width, df_plot["F1_Score"] * mul, width, label="F1-Score", color="#3B82F6")
+        ax_b.plot(x_indices, df_plot["Accuracy"] * mul, marker='o', linewidth=2.5, markersize=8, label="Accuracy", color="#FF6B6B")
+        ax_b.plot(x_indices, df_plot["Precision"] * mul, marker='s', linewidth=2.5, markersize=8, label="Precision", color="#4ECDC4")
+        ax_b.plot(x_indices, df_plot["Recall"] * mul, marker='^', linewidth=2.5, markersize=8, label="Recall", color="#FFD93D")
+        ax_b.plot(x_indices, df_plot["F1_Score"] * mul, marker='D', linewidth=2.5, markersize=8, label="F1-Score", color="#6C5CE7")
         
         ax_b.set_xticks(x_indices)
         ax_b.set_xticklabels(df_plot["K_Value"])
